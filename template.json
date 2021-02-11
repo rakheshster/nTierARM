@@ -1,0 +1,684 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "siteName": {
+            "type": "string",
+            "metadata": {
+                "description": "What site are we deploying to?"
+            },
+            "allowedValues": [
+                "Ireland", "Amsterdam (DR)", "Hong Kong", "Singapore (DR)", "Toronto", "Quebec (DR)"
+            ]
+        },
+        "environmentName": {
+            "type": "string",
+            "metadata": {
+                "description": "What environment are we deploying to?"
+            },
+            "allowedValues": [
+                "Production", "Pre-Production", "Development", "UAT"
+            ]
+        },
+        "tier1Name": {
+            "type": "string",
+            "metadata": {
+                "description": "Generic name for Tier 1"
+            },
+            "defaultValue": "web"
+        },
+        "tier2Name": {
+            "type": "string",
+            "metadata": {
+                "description": "Generic name for Tier 2"
+            },
+            "defaultValue": "application"
+        },
+        "tier3Name": {
+            "type": "string",
+            "metadata": {
+                "description": "Generic name for Tier 1"
+            },
+            "defaultValue": "database"
+        }
+    },
+    "variables": {
+        // these are my various sites and its properties
+        // addressBoundary is used if my addressSpace isn't "clean" - like say its 10.145.128.0/18 and so I have to add 128 to all my subnet offsets
+        // think of addressBase as first two octets and addressBoundary as third octet
+        "siteDefs": {
+            "Ireland": {
+                "sitePrefix": "EU1", 
+                "azLocation": "North Europe", "azLocationCode": "northeurope",
+                "addressSpace": "10.100.0.0/16"
+            },
+            "Amsterdam (DR)": {
+                "sitePrefix": "EU2", 
+                "azLocation": "West Europe", "azLocationCode": "westeurope",
+                "addressSpace": "10.200.0.0/16"
+            },
+            "Toronto": {
+                "sitePrefix": "AM1", 
+                "azLocation": "Canada Central", "azLocationCode": "canadacentral",
+                "addressSpace": "10.110.0.0/16"
+            },
+            "Quebec (DR)": {
+                "sitePrefix": "AM2", 
+                "azLocation": "Canada East", "azLocationCode": "canadaeast",
+                "addressSpace": "10.210.0.0/16"
+            },
+            "Hong Kong": {
+                "sitePrefix": "AP1", 
+                "azLocation": "East Asia", "azLocationCode": "eastasia",
+                "addressSpace": "10.120.0.0/16"
+            },
+            "Singapore (DR)": {
+                "sitePrefix": "AP2", 
+                "azLocation": "Southeast Asia", "azLocationCode": "southeastasia",
+                "addressSpace": "10.220.0.0/16"
+            }
+        },
+        "networkDefs": {
+            "Production": {
+            
+            }
+        },
+        "environmentDefs": {
+            "Production": {
+                "code": "P"
+            },
+            "Pre-Production": {
+                "code": "PP"
+            },
+            "Development": {
+                "code": "D"
+            },
+            "UAT": {
+                "code": "U"
+            }
+        },
+        "environmentSuffix": "[variables('environmentDefs')[parameters('environmentName')].code]",
+        "loadBalancers_EU1_Web_LBU_name": {
+            "defaultValue": "EU1-Web-LBU",
+            "type": "String"
+        },
+        "virtualMachines_EU1_Web01U_name": {
+            "defaultValue": "EU1-Web01U",
+            "type": "String"
+        },
+        "availabilitySets_EU1_Web_AS_name": {
+            "defaultValue": "EU1-Web-AS",
+            "type": "String"
+        },
+        "virtualNetworks_EU1_VNET01U_name": {
+            "defaultValue": "EU1-VNET01U",
+            "type": "String"
+        },
+        "loadBalancers_EU1_Database_LBU_name": {
+            "defaultValue": "EU1-Database-LBU",
+            "type": "String"
+        },
+        "networkInterfaces_eu1_web01u23_name": {
+            "defaultValue": "eu1-web01u23",
+            "type": "String"
+        },
+        "loadBalancers_EU1_Application_LBU_name": {
+            "defaultValue": "EU1-Application-LBU",
+            "type": "String"
+        },
+        "publicIPAddresses_EU1_Web_LBU_PIP_name": {
+            "defaultValue": "EU1-Web-LBU-PIP",
+            "type": "String"
+        },
+        "networkSecurityGroups_EU1_Web_NSGU_name": {
+            "defaultValue": "EU1-Web-NSGU",
+            "type": "String"
+        },
+        "publicIPAddresses_EU1_Database_LBU_PIP_name": {
+            "defaultValue": "EU1-Database-LBU-PIP",
+            "type": "String"
+        },
+        "networkSecurityGroups_EU1_Database_NSGU_name": {
+            "defaultValue": "EU1-Database-NSGU",
+            "type": "String"
+        },
+        "publicIPAddresses_EU1_Application_LBU_PIP_name": {
+            "defaultValue": "EU1-Application-LBU-PIP",
+            "type": "String"
+        },
+        "schedules_shutdown_computevm_eu1_web01u_name": {
+            "defaultValue": "shutdown-computevm-eu1-web01u",
+            "type": "String"
+        },
+        "networkSecurityGroups_EU1_Application_NSGU_name": {
+            "defaultValue": "EU1-Application-NSGU",
+            "type": "String"
+        },
+        "virtualNetworks_EU1_VNET01H_externalid": {
+            "defaultValue": "/subscriptions/a86b351b-c030-4650-b3f5-57ee80436d25/resourceGroups/EU1-RG01H/providers/Microsoft.Network/virtualNetworks/EU1-VNET01H",
+            "type": "String"
+        }
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-05-01",
+            "name": "[parameters('networkSecurityGroups_EU1_Application_NSGU_name')]",
+            "location": "northeurope",
+            "properties": {
+                "securityRules": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-05-01",
+            "name": "[parameters('networkSecurityGroups_EU1_Database_NSGU_name')]",
+            "location": "northeurope",
+            "properties": {
+                "securityRules": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-05-01",
+            "name": "[parameters('networkSecurityGroups_EU1_Web_NSGU_name')]",
+            "location": "northeurope",
+            "properties": {
+                "securityRules": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-05-01",
+            "name": "[parameters('publicIPAddresses_EU1_Application_LBU_PIP_name')]",
+            "location": "northeurope",
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "ipAddress": "20.54.93.21",
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Static",
+                "idleTimeoutInMinutes": 4,
+                "ipTags": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-05-01",
+            "name": "[parameters('publicIPAddresses_EU1_Database_LBU_PIP_name')]",
+            "location": "northeurope",
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "ipAddress": "52.146.152.192",
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Static",
+                "idleTimeoutInMinutes": 4,
+                "ipTags": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-05-01",
+            "name": "[parameters('publicIPAddresses_EU1_Web_LBU_PIP_name')]",
+            "location": "northeurope",
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "ipAddress": "52.146.156.23",
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Static",
+                "idleTimeoutInMinutes": 4,
+                "ipTags": []
+            }
+        },
+        {
+            "type": "Microsoft.Compute/availabilitySets",
+            "apiVersion": "2019-07-01",
+            "name": "[parameters('availabilitySets_EU1_Web_AS_name')]",
+            "location": "northeurope",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_EU1_Web01U_name'))]"
+            ],
+            "sku": {
+                "name": "Aligned"
+            },
+            "properties": {
+                "platformUpdateDomainCount": 5,
+                "platformFaultDomainCount": 3,
+                "virtualMachines": [
+                    {
+                        "id": "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_EU1_Web01U_name'))]"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "microsoft.devtestlab/schedules",
+            "apiVersion": "2018-09-15",
+            "name": "[parameters('schedules_shutdown_computevm_eu1_web01u_name')]",
+            "location": "northeurope",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_EU1_Web01U_name'))]"
+            ],
+            "properties": {
+                "status": "Enabled",
+                "taskType": "ComputeVmShutdownTask",
+                "dailyRecurrence": {
+                    "time": "1900"
+                },
+                "timeZoneId": "UTC",
+                "notificationSettings": {
+                    "status": "Enabled",
+                    "timeInMinutes": 30,
+                    "emailRecipient": "kishor.raghavani@walkersoffshore.onmicrosoft.com",
+                    "notificationLocale": "en"
+                },
+                "targetResourceId": "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_EU1_Web01U_name'))]"
+            }
+        },
+        {
+            "type": "Microsoft.Network/loadBalancers",
+            "apiVersion": "2020-05-01",
+            "name": "[parameters('loadBalancers_EU1_Application_LBU_name')]",
+            "location": "northeurope",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_EU1_Application_LBU_PIP_name'))]"
+            ],
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "LoadBalancerFrontEnd",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_EU1_Application_LBU_PIP_name'))]"
+                            },
+                            "privateIPAddressVersion": "IPv4"
+                        }
+                    }
+                ],
+                "backendAddressPools": [],
+                "loadBalancingRules": [],
+                "probes": [],
+                "inboundNatRules": [],
+                "outboundRules": [],
+                "inboundNatPools": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/loadBalancers",
+            "apiVersion": "2020-05-01",
+            "name": "[parameters('loadBalancers_EU1_Database_LBU_name')]",
+            "location": "northeurope",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_EU1_Database_LBU_PIP_name'))]"
+            ],
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "LoadBalancerFrontEnd",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_EU1_Database_LBU_PIP_name'))]"
+                            },
+                            "privateIPAddressVersion": "IPv4"
+                        }
+                    }
+                ],
+                "backendAddressPools": [],
+                "loadBalancingRules": [],
+                "probes": [],
+                "inboundNatRules": [],
+                "outboundRules": [],
+                "inboundNatPools": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/loadBalancers/backendAddressPools",
+            "apiVersion": "2020-05-01",
+            "name": "[concat(parameters('loadBalancers_EU1_Web_LBU_name'), '/Web')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/loadBalancers', parameters('loadBalancers_EU1_Web_LBU_name'))]"
+            ],
+            "properties": {
+                "loadBalancerBackendAddresses": [
+                    {
+                        "name": "EU1-RG01U_eu1-web01u23ipconfig1",
+                        "properties": {}
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+            "apiVersion": "2020-05-01",
+            "name": "[concat(parameters('virtualNetworks_EU1_VNET01U_name'), '/', parameters('virtualNetworks_EU1_VNET01U_name'), '-EU1-VNET01H')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_EU1_VNET01U_name'))]"
+            ],
+            "properties": {
+                "peeringState": "Connected",
+                "remoteVirtualNetwork": {
+                    "id": "[parameters('virtualNetworks_EU1_VNET01H_externalid')]"
+                },
+                "allowVirtualNetworkAccess": true,
+                "allowForwardedTraffic": true,
+                "allowGatewayTransit": false,
+                "useRemoteGateways": false,
+                "remoteAddressSpace": {
+                    "addressPrefixes": [
+                        "172.16.0.0/16"
+                    ]
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2019-07-01",
+            "name": "[parameters('virtualMachines_EU1_Web01U_name')]",
+            "location": "northeurope",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/availabilitySets', parameters('availabilitySets_EU1_Web_AS_name'))]",
+                "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_eu1_web01u23_name'))]"
+            ],
+            "properties": {
+                "availabilitySet": {
+                    "id": "[resourceId('Microsoft.Compute/availabilitySets', parameters('availabilitySets_EU1_Web_AS_name'))]"
+                },
+                "hardwareProfile": {
+                    "vmSize": "Standard_B2s"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "MicrosoftWindowsServer",
+                        "offer": "WindowsServer",
+                        "sku": "2019-Datacenter",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "osType": "Windows",
+                        "name": "[concat(parameters('virtualMachines_EU1_Web01U_name'), '_OsDisk_1_c5493e635b0749f4879bb4a85d3f396d')]",
+                        "createOption": "FromImage",
+                        "caching": "ReadWrite",
+                        "managedDisk": {
+                            "id": "[resourceId('Microsoft.Compute/disks', concat(parameters('virtualMachines_EU1_Web01U_name'), '_OsDisk_1_c5493e635b0749f4879bb4a85d3f396d'))]"
+                        }
+                    },
+                    "dataDisks": []
+                },
+                "osProfile": {
+                    "computerName": "[parameters('virtualMachines_EU1_Web01U_name')]",
+                    "adminUsername": "kraghavani",
+                    "windowsConfiguration": {
+                        "provisionVMAgent": true,
+                        "enableAutomaticUpdates": true
+                    },
+                    "secrets": [],
+                    "allowExtensionOperations": true,
+                    "requireGuestProvisionSignal": true
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_eu1_web01u23_name'))]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true
+                    }
+                },
+                "licenseType": "Windows_Server"
+            }
+        },
+        {
+            "type": "Microsoft.Network/loadBalancers",
+            "apiVersion": "2020-05-01",
+            "name": "[parameters('loadBalancers_EU1_Web_LBU_name')]",
+            "location": "northeurope",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_EU1_Web_LBU_PIP_name'))]",
+                "[resourceId('Microsoft.Network/loadBalancers/backendAddressPools', parameters('loadBalancers_EU1_Web_LBU_name'), 'Web')]"
+            ],
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "LoadBalancerFrontEnd",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_EU1_Web_LBU_PIP_name'))]"
+                            },
+                            "privateIPAddressVersion": "IPv4"
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "Web",
+                        "properties": {
+                            "loadBalancerBackendAddresses": [
+                                {
+                                    "name": "EU1-RG01U_eu1-web01u23ipconfig1",
+                                    "properties": {}
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "loadBalancingRules": [],
+                "probes": [],
+                "inboundNatRules": [],
+                "outboundRules": [
+                    {
+                        "name": "Web-Outbound",
+                        "properties": {
+                            "allocatedOutboundPorts": 21328,
+                            "protocol": "All",
+                            "enableTcpReset": true,
+                            "idleTimeoutInMinutes": 4,
+                            "backendAddressPool": {
+                                "id": "[resourceId('Microsoft.Network/loadBalancers/backendAddressPools', parameters('loadBalancers_EU1_Web_LBU_name'), 'Web')]"
+                            },
+                            "frontendIPConfigurations": [
+                                {
+                                    "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('loadBalancers_EU1_Web_LBU_name')), '/frontendIPConfigurations/LoadBalancerFrontEnd')]"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "inboundNatPools": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2020-05-01",
+            "name": "[parameters('networkInterfaces_eu1_web01u23_name')]",
+            "location": "northeurope",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_EU1_VNET01U_name'), 'Web')]",
+                "[resourceId('Microsoft.Network/loadBalancers/backendAddressPools', parameters('loadBalancers_EU1_Web_LBU_name'), 'Web')]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAddress": "10.1.0.4",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_EU1_VNET01U_name'), 'Web')]"
+                            },
+                            "primary": true,
+                            "privateIPAddressVersion": "IPv4",
+                            "loadBalancerBackendAddressPools": [
+                                {
+                                    "id": "[resourceId('Microsoft.Network/loadBalancers/backendAddressPools', parameters('loadBalancers_EU1_Web_LBU_name'), 'Web')]"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "dnsSettings": {
+                    "dnsServers": []
+                },
+                "enableAcceleratedNetworking": false,
+                "enableIPForwarding": false
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "apiVersion": "2020-05-01",
+            "name": "[concat(parameters('virtualNetworks_EU1_VNET01U_name'), '/Application')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_EU1_VNET01U_name'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_EU1_Application_NSGU_name'))]"
+            ],
+            "properties": {
+                "addressPrefix": "10.2.0.0/16",
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_EU1_Application_NSGU_name'))]"
+                },
+                "serviceEndpoints": [],
+                "delegations": [],
+                "privateEndpointNetworkPolicies": "Enabled",
+                "privateLinkServiceNetworkPolicies": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "apiVersion": "2020-05-01",
+            "name": "[concat(parameters('virtualNetworks_EU1_VNET01U_name'), '/Database')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_EU1_VNET01U_name'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_EU1_Database_NSGU_name'))]"
+            ],
+            "properties": {
+                "addressPrefix": "10.3.0.0/16",
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_EU1_Database_NSGU_name'))]"
+                },
+                "serviceEndpoints": [],
+                "delegations": [],
+                "privateEndpointNetworkPolicies": "Enabled",
+                "privateLinkServiceNetworkPolicies": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "apiVersion": "2020-05-01",
+            "name": "[concat(parameters('virtualNetworks_EU1_VNET01U_name'), '/Web')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_EU1_VNET01U_name'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_EU1_Web_NSGU_name'))]"
+            ],
+            "properties": {
+                "addressPrefix": "10.1.0.0/16",
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_EU1_Web_NSGU_name'))]"
+                },
+                "serviceEndpoints": [],
+                "delegations": [],
+                "privateEndpointNetworkPolicies": "Enabled",
+                "privateLinkServiceNetworkPolicies": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2020-05-01",
+            "name": "[parameters('virtualNetworks_EU1_VNET01U_name')]",
+            "location": "northeurope",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_EU1_Web_NSGU_name'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_EU1_Database_NSGU_name'))]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_EU1_Application_NSGU_name'))]"
+            ],
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.0.0.0/8"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "Web",
+                        "properties": {
+                            "addressPrefix": "10.1.0.0/16",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_EU1_Web_NSGU_name'))]"
+                            },
+                            "serviceEndpoints": [],
+                            "delegations": [],
+                            "privateEndpointNetworkPolicies": "Enabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    },
+                    {
+                        "name": "Database",
+                        "properties": {
+                            "addressPrefix": "10.3.0.0/16",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_EU1_Database_NSGU_name'))]"
+                            },
+                            "serviceEndpoints": [],
+                            "delegations": [],
+                            "privateEndpointNetworkPolicies": "Enabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    },
+                    {
+                        "name": "Application",
+                        "properties": {
+                            "addressPrefix": "10.2.0.0/16",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_EU1_Application_NSGU_name'))]"
+                            },
+                            "serviceEndpoints": [],
+                            "delegations": [],
+                            "privateEndpointNetworkPolicies": "Enabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    }
+                ],
+                "virtualNetworkPeerings": [
+                    {
+                        "name": "[concat(parameters('virtualNetworks_EU1_VNET01U_name'), '-EU1-VNET01H')]",
+                        "properties": {
+                            "peeringState": "Connected",
+                            "remoteVirtualNetwork": {
+                                "id": "[parameters('virtualNetworks_EU1_VNET01H_externalid')]"
+                            },
+                            "allowVirtualNetworkAccess": true,
+                            "allowForwardedTraffic": true,
+                            "allowGatewayTransit": false,
+                            "useRemoteGateways": false,
+                            "remoteAddressSpace": {
+                                "addressPrefixes": [
+                                    "172.16.0.0/16"
+                                ]
+                            }
+                        }
+                    }
+                ],
+                "enableDdosProtection": false,
+                "enableVmProtection": false
+            }
+        }
+    ]
+}

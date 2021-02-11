@@ -1,0 +1,51 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "loadBalancers_EU1_Web_LBU_name": {
+            "value": null
+        },
+        "virtualMachines_EU1_Web01U_name": {
+            "value": null
+        },
+        "availabilitySets_EU1_Web_AS_name": {
+            "value": null
+        },
+        "virtualNetworks_EU1_VNET01U_name": {
+            "value": null
+        },
+        "loadBalancers_EU1_Database_LBU_name": {
+            "value": null
+        },
+        "networkInterfaces_eu1_web01u23_name": {
+            "value": null
+        },
+        "loadBalancers_EU1_Application_LBU_name": {
+            "value": null
+        },
+        "publicIPAddresses_EU1_Web_LBU_PIP_name": {
+            "value": null
+        },
+        "networkSecurityGroups_EU1_Web_NSGU_name": {
+            "value": null
+        },
+        "publicIPAddresses_EU1_Database_LBU_PIP_name": {
+            "value": null
+        },
+        "networkSecurityGroups_EU1_Database_NSGU_name": {
+            "value": null
+        },
+        "publicIPAddresses_EU1_Application_LBU_PIP_name": {
+            "value": null
+        },
+        "schedules_shutdown_computevm_eu1_web01u_name": {
+            "value": null
+        },
+        "networkSecurityGroups_EU1_Application_NSGU_name": {
+            "value": null
+        },
+        "virtualNetworks_EU1_VNET01H_externalid": {
+            "value": null
+        }
+    }
+}
