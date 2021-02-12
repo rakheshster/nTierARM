@@ -1,0 +1,119 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "siteName": {
+            "type": "String",
+            "metadata": {
+                "description": "Site to deploy to"
+            },
+            "allowedValues": [
+                "Ireland", "Amsterdam (DR)", "Toronto", "Quebec (DR)", "Hong Kong", "Singpore (DR)"
+            ],
+            "defaultValue": "Ireland"
+        },
+        "environmentName": { 
+            "type": "String",
+            "metadata": {
+                "description": "Environment to deploy to"
+            },
+            "allowedValues": [
+                "Production", "Pre-Production", "UAT", "Development"
+            ],
+            "defaultValue": "Production"
+        },
+        "number": {
+            "type": "string",
+            "allowedValues": [
+                "01", "02", "03", "04"
+            ],
+            "metadata": {
+                "description": "01 if for eu1-rg01p, 02 for eu1-rg02p, and so on ..."
+            },
+            "defaultValue": "01"
+        },
+        "principalId": {
+            "type": "string",
+            "metadata": {
+                "description": "principalId of the user/ group that will be given contributor access to this resourceGroup"
+            }
+        },
+        "roleDefinitionId": {
+            "type": "string",
+            "defaultValue": "b24988ac-6180-42a0-ab88-20f7382dd24c",
+            "metadata": {
+                "description": "roleDefinition to apply to the resourceGroup - default is contributor"
+            }
+        }
+    },
+    "variables": { 
+        "siteDefs": {
+            "Ireland":          { "sitePrefix": "eu1", "azLocation": "northeurope" },
+            "Amsterdam (DR)":   { "sitePrefix": "eu2", "azLocation": "westeurope" },
+            "Toronto":          { "sitePrefix": "am1", "azLocation": "canadacentral" },
+            "Quebec (DR)":      { "sitePrefix": "am2", "azLocation": "canadaeast" },
+            "Hong Kong":        { "sitePrefix": "ap1", "azLocation": "eastasia" },
+            "Singapore (DR)":   { "sitePrefix": "ap2", "azLocation": "southeastasia" }
+        },
+        "envDefs": {
+            "Production":       { "envSuffix": "p" },
+            "Pre-Production":   { "envSuffix": "pp" },
+            "UAT":              { "envSuffix": "u" },
+            "Development":      { "envSuffix": "d" }
+        },
+        "rgName": "[concat(variables('siteDefs')[parameters('siteName')].sitePrefix, '-rg', parameters('number'), variables('envDefs')[parameters('environmentName')].envSuffix)]",
+        "azLocation": "[variables('siteDefs')[parameters('siteName')].azLocation]",
+        "roleAssignmentName": "[guid(parameters('principalId'), parameters('roleDefinitionId'), variables('rgName'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Resources/resourceGroups",
+            "apiVersion": "2019-10-01",
+            "name": "[variables('rgName')]",
+            "location": "[variables('azLocation')]",
+            "tags": {
+                "Note": "subscription level deployment"
+            },
+            
+            "properties": {}
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2019-10-01",
+            "name": "applyLock",
+            "resourceGroup": "[variables('rgName')]",
+            "dependsOn": [
+                "[variables('rgName')]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "template": {
+                    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+                    "contentVersion": "1.0.0.0",
+                    "resources": [
+                        {
+                            "type": "Microsoft.Authorization/locks",
+                            "apiVersion": "2017-04-01",
+                            "name": "DontDelete",
+                            "properties": {
+                                "level": "CanNotDelete",
+                                "notes": "Prevent deletion of the resourceGroup"
+                            }
+                        },
+                        {
+                            "type": "Microsoft.Authorization/roleAssignments",
+                            "apiVersion": "2020-04-01-preview",
+                            "name": "[guid(variables('roleAssignmentName'))]",
+                            "properties": {
+                                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('roleDefinitionId'))]",
+                                "principalId": "[parameters('principalId')]",
+                                "scope": "[subscriptionResourceId('Microsoft.Resources/resourceGroups', variables('rgName'))]"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    ]
+}
+  

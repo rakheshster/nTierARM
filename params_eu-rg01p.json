@@ -1,0 +1,21 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "siteName": {
+            "value": "Ireland"
+        },
+        "environmentName": {
+            "value": "Production"
+        },
+        "number": {
+            "value": "01"
+        },
+        "principalId": {
+            "value": "2d5034bf-d3c3-4b4d-a04f-af74cc637cae"
+        },
+        "roleDefinitionId": {
+            "value": "b24988ac-6180-42a0-ab88-20f7382dd24c"
+        }
+    }
+}
