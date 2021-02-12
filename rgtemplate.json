@@ -22,7 +22,7 @@
             ],
             "defaultValue": "Production"
         },
-        "number": {
+        "rgNumber": {
             "type": "string",
             "allowedValues": [
                 "01", "02", "03", "04"
@@ -57,11 +57,11 @@
         },
         "envDefs": {
             "Production":       { "envSuffix": "p" },
-            "Pre-Production":   { "envSuffix": "pp" },
+            "Pre-Production":   { "envSuffix": "e" },
             "UAT":              { "envSuffix": "u" },
             "Development":      { "envSuffix": "d" }
         },
-        "rgName": "[concat(variables('siteDefs')[parameters('siteName')].sitePrefix, '-rg', parameters('number'), variables('envDefs')[parameters('environmentName')].envSuffix)]",
+        "rgName": "[concat(variables('siteDefs')[parameters('siteName')].sitePrefix, '-rg', parameters('rgNumber'), variables('envDefs')[parameters('environmentName')].envSuffix)]",
         "azLocation": "[variables('siteDefs')[parameters('siteName')].azLocation]",
         "roleAssignmentName": "[guid(parameters('principalId'), parameters('roleDefinitionId'), variables('rgName'))]"
     },

@@ -15,74 +15,87 @@
                 "description": "Do you want a gateway subnet?"
             },
             "defaultValue": false
+        },
+        "vnetNumber": {
+            "type": "string",
+            "allowedValues": [
+                "01", "02", "03", "04"
+            ],
+            "metadata": {
+                "description": "01 if for vnet01, 02 for vnet02, and so on ..."
+            },
+            "defaultValue": "01"
         }
     },
     "variables": {
         // these are my various sites and their properties - I use this to get the code based on selections above
-        // I use addressPrefix later to form the subnet
-        // subnetSize is the last octet of the subnet (including subnet mask). subnetIncrements is how I increment the 3rd octet for each subnet. 
-        // if you change subnetSize be sure to change subnetIncrements as the two are dependent. 
-        // I iterate over the array of tiers and make the subnet address by concatenating "addressPrefix.(increment x iternation).size"
-        // to take the example of Ireland my subnets would be 10.10.0.0/23 (unused), 10.10.2.0/23 (tier1), 10.10.4.0/23 (tier2), and so on ...
-        // note: we have overlapping subnets & address spaces across the environments. which is fine as they are not peering. 
+        // subnetGap is how I increment the 3rd octet for each subnet/ tier. if I change this be sure to change subnetSize mask.
+        // first octet is constant. second octet is incremented per environment. third octet is incremented per subnet. last octet is the host address.
         "siteDefs": {
             // Ireland
             "northeurope": {
-                "sitePrefix": "eu1", "addressSpace": "10.10.0.0/16", "addressPrefix": "10.10",
-                "subnetSize": "0/23", "subnetIncrements": 2
+                "sitePrefix": "eu1", 
+                "octet1": 10, "octet2": 110, "octet3": 0, "subnetSize": "0/23", "subnetGap": 2, "addressSpace": "/16"
             },
             // Amsterdam (DR)
             "westeurope": {
-                "sitePrefix": "eu2", "addressSpace": "10.11.0.0/16", "addressPrefix": "10.11",
-                "subnetSize": "0/23", "subnetIncrements": 2
+                "sitePrefix": "eu2", 
+                "octet1": 10, "octet2": 210, "octet3": 0, "subnetSize": "0/23", "subnetGap": 2, "addressSpace": "/16"
             },
             // Toronto
             "canadacentral": {
-                "sitePrefix": "am1", "addressSpace": "10.20.0.0/16", "addressPrefix": "10.20",
-                "subnetSize": "0/23", "subnetIncrements": 2
+                "sitePrefix": "am1", 
+                "octet1": 10, "octet2": 120, "octet3": 0, "subnetSize": "0/23", "subnetGap": 2, "addressSpace": "/16"
             },
             // Quebec (DR)
             "canadaeast": {
-                "sitePrefix": "am2", "addressSpace": "10.21.0.0/16", "addressPrefix": "10.21",
-                "subnetSize": "0/23", "subnetIncrements": 2
+                "sitePrefix": "am2", 
+                "octet1": 10, "octet2": 220, "octet3": 0, "subnetSize": "0/23", "subnetGap": 2, "addressSpace": "/16"
             },
             // Hong Kong
             "eastasia": {
-                "sitePrefix": "ap1", "addressSpace": "10.30.0.0/16", "addressPrefix": "10.30",
-                "subnetSize": "0/23", "subnetIncrements": 2
+                "sitePrefix": "ap1", 
+                "octet1": 10, "octet2": 130, "octet3": 0, "subnetSize": "0/23", "subnetGap": 2, "addressSpace": "/16"
             },
             // Singapore (DR)
             "southeastasia": {
-                "sitePrefix": "ap2", "addressSpace": "10.31.0.0/16", "addressPrefix": "10.31",
-                "subnetSize": "0/23", "subnetIncrements": 2
+                "sitePrefix": "ap2", 
+                "octet1": 10, "octet2": 230, "octet3": 0, "subnetSize": "0/23", "subnetGap": 2, "addressSpace": "/16"
             }
         },
         // setting these variables so I can refer to them easily later rather than use the long form referencing the array
         "azlocation": "[resourceGroup().location]",
         "sitePrefix": "[variables('siteDefs')[variables('azlocation')].sitePrefix]",
-        "addressSpace": "[variables('siteDefs')[variables('azlocation')].addressSpace]",
-        "addressPrefix": "[variables('siteDefs')[variables('azlocation')].addressPrefix]",
-        "subnetSize": "[variables('siteDefs')[variables('azlocation')].subnetSize]",
-        "subnetIncrements": "[variables('siteDefs')[variables('azlocation')].subnetIncrements]",
 
         // figuring out the environment suffix based on the resurce group name. I need this for the resources I create. 
         // the resource group (which is pre-created) is of the format <sitePrefix>-rg[u|p|pp|d] so I can extract the last char to get suffix
         "environmentSuffix": "[toLower(last(resourceGroup().name))]",
-        "vnetName": "[concat(variables('sitePrefix'), '-vnet', variables('environmentSuffix'))]",
+        "envDefs": {
+            "p":  { "envIncrement": 0 },
+            "e":  { "envIncrement": 1 },
+            "u":  { "envIncrement": 2 },
+            "d":  { "envIncrement": 3 }
+        },
 
-        // put the tier names in an array so I can loop over them later. I do this over 3 lines just to make this more readable. 
-        // I use this as the subnet names and also for load balancers, NSGs, etc.
-        // I add an extra tier called GatewaySubnet or Unused depending on if it has been asked for
-        "inputTiersArray": "[split(parameters('tierNames'), ' ')]",
-        "gatewayArray": "[if(parameters('gatewaySubnetRequired'), array('GatewaySubnet'), array('Unused'))]",
-        "tiersArray": "[concat(variables('gatewayArray'),variables('inputTiersArray'))]"
+        // I create my real octets based on the env & region; then create variables for addressSpace and addressPrefix so I can use them easily later
+        "octet1": "[variables('siteDefs')[variables('azlocation')].octet1]",
+        "octet2": "[add(variables('siteDefs')[variables('azlocation')].octet2, variables('envDefs')[variables('environmentSuffix')].envIncrement)]",
+        "octet3": "[variables('siteDefs')[variables('azlocation')].octet3]",
+
+        "subnetSize": "[variables('siteDefs')[variables('azlocation')].subnetSize]",
+        "subnetGap": "[variables('siteDefs')[variables('azlocation')].subnetGap]",
+        "addressSpace": "[concat(variables('octet1'), '.', variables('octet2'), '.', variables('octet3'), '.', variables('subnetSize'))]",
+        "addressPrefix": "[concat(variables('octet1'), '.', variables('octet2'))]",
+        "vnetName": "[concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), variables('environmentSuffix'))]",
+
+        // put the tier names in an array so I can loop over them later.
+        "tiersArray": "[split(parameters('tierNames'), ' ')]",
+        "gatewayTier": "[if(parameters('gatewaySubnetRequired'), 'GatewaySubnet', 'Unused')]"
     },
     "resources": [
         // === Network Security Groups ===
         {
             "type": "Microsoft.Network/networkSecurityGroups",
-            // dont do this for the GatewaySubnet or Unused subnet
-            "condition": "[and(not(equals(variables('tiersArray')[copyIndex()], 'GatewaySubnet')), not(equals(variables('tiersArray')[copyIndex()], 'Unused')))]",
             "apiVersion": "2020-05-01",
             // the name is <site code>-<tier name>-nsg<env suffix>
             "name": "[concat(variables('sitePrefix'), '-', toLower(variables('tiersArray')[copyIndex()]), '-nsg', variables('environmentSuffix'))]",
@@ -114,18 +127,19 @@
                 // and I couldn't put in a condition block within a copy block. so I split out subnet creation for later. 
             }
         },
-        // === Subnets (except Gateway and Unused)===
+        // === Subnets ===
         {
             "type": "Microsoft.Network/virtualNetworks/subnets",
             // dont do this for the GatewaySubnet or Unused subnet
-            "condition": "[and(not(equals(variables('tiersArray')[copyIndex()], 'GatewaySubnet')), not(equals(variables('tiersArray')[copyIndex()], 'Unused')))]",
             "apiVersion": "2020-07-01",
             // the name is <vnetName>/<tierName>
             "name": "[concat(variables('vnetName'), '/', variables('tiersArray')[copyIndex()])]",
             "properties": {
-                "addressPrefix": "[concat(variables('addressPrefix'), '.', mul(variables('subnetIncrements'),copyIndex()), '.', variables('subnetSize'))]",
+                // I want to leave the 0 subnet free (e.g. 10.110.0) and start from 2 (or whatever the gap is) instead (10.110.2). 
+                // Hence I do a little addition below to copyIndex() :)
+                "addressPrefix": "[concat(variables('addressPrefix'), '.', mul(variables('subnetGap'),add(1,copyIndex())), '.', variables('subnetSize'))]",
                 "networkSecurityGroup": {
-                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', concat(variables('sitePrefix'), toLower(variables('tiersArray')[copyIndex()]), '-nsg', variables('environmentSuffix')))]"
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', concat(variables('sitePrefix'), '-', toLower(variables('tiersArray')[copyIndex()]), '-nsg', variables('environmentSuffix')))]"
                 }
             },
             "dependsOn": [
@@ -139,32 +153,24 @@
                 "count": "[length(variables('tiersArray'))]"
             }
         },
-        // === Subnets (Gateway and Unused) ===
+        // === Special case of the first subnet that I skipped above ===
         // this is same as above except it has no NSG
         {
             "type": "Microsoft.Network/virtualNetworks/subnets",
             // special case for the GatewaySubnet
-            "condition": "[or(equals(variables('tiersArray')[copyIndex()], 'GatewaySubnet'), equals(variables('tiersArray')[copyIndex()], 'Unused'))]",
             "apiVersion": "2020-07-01",
             // the name is <vnetName>/<tierName>
-            "name": "[concat(variables('vnetName'), '/', variables('tiersArray')[copyIndex()])]",
+            "name": "[concat(variables('vnetName'), '/', variables('gatewayTier'))]",
             "properties": {
-                "addressPrefix": "[concat(variables('addressPrefix'), '.', mul(variables('subnetIncrements'),copyIndex()), '.', variables('subnetSize'))]"
+                "addressPrefix": "[concat(variables('addressPrefix'), '.0.', variables('subnetSize'))]"
             },
             "dependsOn": [
                 "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
-            ],
-            // loop over each of my tiers to create this per tier
-            "copy": {
-                "name": "subnet-loop",
-                "count": "[length(variables('tiersArray'))]"
-            }
+            ]
         },
         // === Public IPs for my Load Balancers ===
         {
             "type": "Microsoft.Network/publicIPAddresses",
-            // dont do this for the GatewaySubnet or Unused subnet
-            "condition": "[and(not(equals(variables('tiersArray')[copyIndex()], 'GatewaySubnet')), not(equals(variables('tiersArray')[copyIndex()], 'Unused')))]",
             "apiVersion": "2020-07-01",
             // the name is <site code>-<tier name>-lbpip<env suffix>
             "name": "[concat(variables('sitePrefix'), '-', toLower(variables('tiersArray')[copyIndex()]), '-lbpip', variables('environmentSuffix'))]",
@@ -187,8 +193,6 @@
         // === Load Balancers (except Gateway and Unused)===
         {
             "type": "Microsoft.Network/loadBalancers",
-            // dont do this for the GatewaySubnet or Unused subnet
-            "condition": "[and(not(equals(variables('tiersArray')[copyIndex()], 'GatewaySubnet')), not(equals(variables('tiersArray')[copyIndex()], 'Unused')))]",
             "apiVersion": "2020-05-01",
             // the name is <site code>-<tier name>-lb<env suffix>
             "name": "[concat(variables('sitePrefix'), '-', toLower(variables('tiersArray')[copyIndex()]), '-lb', variables('environmentSuffix'))]",
