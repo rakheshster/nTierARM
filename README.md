@@ -1,4 +1,6 @@
 ## To deploy the resource group
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Frakheshster%2FnTierARM%2Fmain%2Frgtemplate.json)
+
 ```
 az deployment sub create --location <location> --template-file <path-to-template>
 ```
@@ -13,24 +15,17 @@ And this for a user ID:
 az ad user show --id "{email}" --query objectId --output tsv
 ```
 
-Example:
-```
-az deployment group create --resource-group eu-rg01p --template template.json
-```
 
 ## To deploy the VNets etc. to the resource group
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Frakheshster%2FnTierARM%2Fmain%2Ftemplate.json)
+
 ```
 az deployment group create --resource-group <resource-group-name> --template-file <path-to-template>
 ```
 
-Example:
-```
-az deployment group create --resource-group eu1-rg01p --template-file template.json --parameters params_web-app-db-nogw.json
-```
-
 Add `--confirm-with-what-if` to see changes. 
 
-## Note to self on the mode
+## A reminder on the deployment mode
 
 Default deployment mode is Incremental. Resources not specified in the ARM template aren't removed. You can change this to Complete which *removes* any resources not specified in the ARM template. To do so add `--mode Complete`.
 
