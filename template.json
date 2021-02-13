@@ -129,7 +129,7 @@
             {
                 // Production (suffix is 'p')
                 "vnetName": "[concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), 'p')]",
-                "vnetID": "[resourceId(concat(variables('rgNameNoEnv'), 'p'), 'Microsoft.Network/virtualNetworks', variables('hubvnetName'))]",
+                "vnetID": "[resourceId(concat(variables('rgNameNoEnv'), 'p'), 'Microsoft.Network/virtualNetworks', concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), 'p'))]",
                 // that's some crazy sh*t I am doing here haha. prepare to be impressed my future self! 
                 // octet1 is the same across all my environments. so I can reuse that. 
                 // octet2 needs changing per environment (add the increment basically)
@@ -142,19 +142,19 @@
             {
                 // Pre-Production (suffix is 'e')
                 "vnetName": "[concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), 'e')]",
-                "vnetID": "[resourceId(concat(variables('rgNameNoEnv'), 'e'), 'Microsoft.Network/virtualNetworks', variables('hubvnetName'))]",
+                "vnetID": "[resourceId(concat(variables('rgNameNoEnv'), 'e'), 'Microsoft.Network/virtualNetworks', concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), 'e'))]",
                 "addressSpace": "[concat(variables('octet1'), '.', add(variables('siteDefs')[variables('azlocation')].octet2, variables('envDefs').e.envIncrement), '.', variables('octet3'), '.0', variables('siteDefs')[variables('azlocation')].addressSpace)]"
             },
             {
                 // UAT (suffix is u)
                 "vnetName": "[concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), 'u')]",
-                "vnetID": "[resourceId(concat(variables('rgNameNoEnv'), 'u'), 'Microsoft.Network/virtualNetworks', variables('hubvnetName'))]",
+                "vnetID": "[resourceId(concat(variables('rgNameNoEnv'), 'u'), 'Microsoft.Network/virtualNetworks', concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), 'u'))]",
                 "addressSpace": "[concat(variables('octet1'), '.', add(variables('siteDefs')[variables('azlocation')].octet2, variables('envDefs').u.envIncrement), '.', variables('octet3'), '.0', variables('siteDefs')[variables('azlocation')].addressSpace)]"
             },
             {
                 // Development (suffix is d)
                 "vnetName": "[concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), 'd')]",
-                "vnetID": "[resourceId(concat(variables('rgNameNoEnv'), 'd'), 'Microsoft.Network/virtualNetworks', variables('hubvnetName'))]",
+                "vnetID": "[resourceId(concat(variables('rgNameNoEnv'), 'd'), 'Microsoft.Network/virtualNetworks', concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), 'd'))]",
                 "addressSpace": "[concat(variables('octet1'), '.', add(variables('siteDefs')[variables('azlocation')].octet2, variables('envDefs').d.envIncrement), '.', variables('octet3'), '.0', variables('siteDefs')[variables('azlocation')].addressSpace)]"
             }
         ],
