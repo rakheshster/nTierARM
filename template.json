@@ -98,7 +98,7 @@
 
         "subnetSize": "[variables('siteDefs')[variables('azlocation')].subnetSize]",
         "subnetGap": "[variables('siteDefs')[variables('azlocation')].subnetGap]",
-        "addressSpace": "[concat(variables('octet1'), '.', variables('octet2'), '.', variables('octet3'), '.', variables('subnetSize'))]",
+        "addressSpace": "[concat(variables('octet1'), '.', variables('octet2'), '.', variables('octet3'), '.0', variables('siteDefs')[variables('azlocation')].addressSpace)]",
         "addressPrefix": "[concat(variables('octet1'), '.', variables('octet2'))]",
         "vnetName": "[concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), variables('environmentSuffix'))]",
 
@@ -109,8 +109,7 @@
         "huboctet1": "[variables('siteDefs')[variables('azlocation')].octet1]",
         "huboctet2": "[add(variables('siteDefs')[variables('azlocation')].octet2, variables('envDefs').h.envIncrement)]",
         "huboctet3": "[variables('siteDefs')[variables('azlocation')].octet3]",
-        "hubsubnetSize": "[variables('siteDefs')[variables('azlocation')].subnetSize]",
-        "hubaddressSpace": "[concat(variables('huboctet1'), '.', variables('huboctet2'), '.', variables('huboctet3'), '.', variables('hubsubnetSize'))]",
+        "hubaddressSpace": "[concat(variables('huboctet1'), '.', variables('huboctet2'), '.', variables('huboctet3'), '.0', variables('siteDefs')[variables('azlocation')].subnetSize)]",
 
         // put the tier names in an array so I can loop over them later.
         "tiersArray": "[split(parameters('tierNames'), ' ')]",
@@ -159,6 +158,9 @@
             "condition": "[parameters('createPeering')]",
             "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
             "name": "[concat(variables('vnetName'), '/', variables('vnetName'),'_',variables('hubvnetName'),'-peering')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+            ],
             "apiVersion": "2020-07-01",
             "properties": {
                 "allowVirtualNetworkAccess": true,
