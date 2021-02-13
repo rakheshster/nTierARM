@@ -8,8 +8,9 @@
                 "description": "A space separated list of tiers (leave at default if none)"
             },
             "defaultValue": "<none>"
-            // note to future self: I have to workaround like this because an empty string becomes an array of one "emptiness" apparently
-            // when I split later. so I need to put some placeholder text I can match against as the default. 
+            // note to future self: 
+            // I have to workaround like this because an empty string becomes an array of one "emptiness" apparently when I split later. 
+            // so I need to put some placeholder text I can match against as the default. later if I find this parameter to be <none> I know nothing was asked for. 
             // the alternative is to not have a default value and so the array is empty. but this fails because then ARM considers the array
             // as not existing in the first place. so I will have to do a hack like proxy this array. 
             // see https://stackoverflow.com/questions/53722613/arm-resource-iteration-failing-with-an-empty-array for some context
@@ -17,7 +18,7 @@
         "mgmtSubnetRequired": {
             "type": "bool",
             "metadata": {
-                "description": "Do you want a management/ hub subnet?"
+                "description": "Do you want a management tier (subnet)?"
             },
             "defaultValue": true
         },
@@ -33,10 +34,10 @@
         },
         "createPeering": {
             "type": "bool",
+            "defaultValue": false,
             "metadata": {
-                "description": "Create peering to hub vnet?"
-            },
-            "defaultValue": true
+                "description": "Only used for the hub environment. Set to true once all other environments are created, to create peering from hub to those."
+            }
         }
     },
     "variables": {
@@ -83,15 +84,19 @@
         // figuring out the environment suffix based on the resurce group name. I need this for the resources I create. 
         // the resource group (which is pre-created) is of the format <sitePrefix>-rg[u|p|pp|d] so I can extract the last char to get suffix
         "environmentSuffix": "[toLower(last(resourceGroup().name))]",
+        // **note** if you change these suffixes be sure to change the tables and variables below
+        // envIncrement is how I increment the second octet of the network per environment
+        // peerTableIndex is used by me to tap into the peerTable array I create later. 
         "envDefs": {
-            "p":  { "envIncrement": 0 },
-            "e":  { "envIncrement": 1 },
-            "u":  { "envIncrement": 2 },
-            "d":  { "envIncrement": 3 },
-            "h":  { "envIncrement": 4 } // if you change this be sure to change the hubvnetName etc. variables below
+            "p":  { "envIncrement": 0, "peerTableIndex": 0 },
+            "e":  { "envIncrement": 1, "peerTableIndex": 1 },
+            "u":  { "envIncrement": 2, "peerTableIndex": 2 },
+            "d":  { "envIncrement": 3, "peerTableIndex": 3 },
+            "h":  { "envIncrement": 4, "peerTableIndex": 999 } // peerTable number doesn't matter for hub
         },
 
         // I create my real octets based on the env & region; then create variables for addressSpace and addressPrefix so I can use them easily later
+        // these are for whatever environment I am deploying to. 
         "octet1": "[variables('siteDefs')[variables('azlocation')].octet1]",
         "octet2": "[add(variables('siteDefs')[variables('azlocation')].octet2, variables('envDefs')[variables('environmentSuffix')].envIncrement)]",
         "octet3": "[variables('siteDefs')[variables('azlocation')].octet3]",
@@ -102,14 +107,57 @@
         "addressPrefix": "[concat(variables('octet1'), '.', variables('octet2'))]",
         "vnetName": "[concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), variables('environmentSuffix'))]",
 
-        // calculate the hub resource groups's vnet name etc. so I can use it for peering later if it exists
-        "hubvnetName": "[replace(variables('vnetName'), variables('environmentSuffix'), 'h')]",
-        "hubrgName": "[replace(resourceGroup().name, variables('environmentSuffix'), 'h')]",
+        // I want to get the resource group name without the env suffix so I can refer to it for peering
+        // first I get the length and subtract one 
+        "rgSubLength": "[sub(length(resourceGroup().name),1)]",
+        "rgNameNoEnv": "[substring(resourceGroup().name, 0, variables('rgSubLength'))]",
+
+        // calculate the hub env's resource groups's vnet name etc. so I can use it for peering
+        // I put this out of the table below in case I add more environments to the table later. I don't want to depend on the position of the hub in the table. 
+        // I guess I could have put it as index 0 but I felt that to be messy. I want prod to be index 0. 
+        "hubvnetName": "[concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), 'h')]",
+        "hubrgName": "[concat(variables('rgNameNoEnv'), 'h')]",
         "hubvnetID": "[resourceId(variables('hubrgName'), 'Microsoft.Network/virtualNetworks', variables('hubvnetName'))]",
-        "huboctet1": "[variables('siteDefs')[variables('azlocation')].octet1]",
         "huboctet2": "[add(variables('siteDefs')[variables('azlocation')].octet2, variables('envDefs').h.envIncrement)]",
-        "huboctet3": "[variables('siteDefs')[variables('azlocation')].octet3]",
-        "hubaddressSpace": "[concat(variables('huboctet1'), '.', variables('huboctet2'), '.', variables('huboctet3'), '.0', variables('siteDefs')[variables('azlocation')].addressSpace)]",
+        "hubaddressSpace": "[concat(variables('octet1'), '.', variables('huboctet2'), '.', variables('octet3'), '.0', variables('siteDefs')[variables('azlocation')].addressSpace)]",
+
+        // this is a table that contains the address space, vnet etc. for all my environments. I put them in an array so I can copy() and create multiple peerings.
+        // this way I can easily create peerings. hmm, maybe "easily" is the wrong word. this is a messy yarn to untangle! good messy though.
+        // thank you Siri for playing all those nice songs while I worked through this. 
+        // hub is a special case so I will treat it separately outside the table.  
+        "peerTable": [
+            {
+                // Production (suffix is 'p')
+                "vnetName": "[concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), 'p')]",
+                "vnetID": "[resourceId(concat(variables('rgNameNoEnv'), 'p'), 'Microsoft.Network/virtualNetworks', variables('hubvnetName'))]",
+                // that's some crazy sh*t I am doing here haha. prepare to be impressed my future self! 
+                // octet1 is the same across all my environments. so I can reuse that. 
+                // octet2 needs changing per environment (add the increment basically)
+                // octet3 and octet4 (the address space) can be reused 
+                // note: I can't keep this "clean" like I did for "huboctet2" etc. above as I can't have the array refer to itself. gives me an error:
+                // 'The template variable 'peerTable' is not valid: Circular dependency detected in template language expression: 'peerTable'
+                // so I have to make it longish and hard to read. 
+                "addressSpace": "[concat(variables('octet1'), '.', add(variables('siteDefs')[variables('azlocation')].octet2, variables('envDefs').p.envIncrement), '.', variables('octet3'), '.0', variables('siteDefs')[variables('azlocation')].addressSpace)]"
+            },
+            {
+                // Pre-Production (suffix is 'e')
+                "vnetName": "[concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), 'e')]",
+                "vnetID": "[resourceId(concat(variables('rgNameNoEnv'), 'e'), 'Microsoft.Network/virtualNetworks', variables('hubvnetName'))]",
+                "addressSpace": "[concat(variables('octet1'), '.', add(variables('siteDefs')[variables('azlocation')].octet2, variables('envDefs').e.envIncrement), '.', variables('octet3'), '.0', variables('siteDefs')[variables('azlocation')].addressSpace)]"
+            },
+            {
+                // UAT (suffix is u)
+                "vnetName": "[concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), 'u')]",
+                "vnetID": "[resourceId(concat(variables('rgNameNoEnv'), 'u'), 'Microsoft.Network/virtualNetworks', variables('hubvnetName'))]",
+                "addressSpace": "[concat(variables('octet1'), '.', add(variables('siteDefs')[variables('azlocation')].octet2, variables('envDefs').u.envIncrement), '.', variables('octet3'), '.0', variables('siteDefs')[variables('azlocation')].addressSpace)]"
+            },
+            {
+                // Development (suffix is d)
+                "vnetName": "[concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), 'd')]",
+                "vnetID": "[resourceId(concat(variables('rgNameNoEnv'), 'd'), 'Microsoft.Network/virtualNetworks', variables('hubvnetName'))]",
+                "addressSpace": "[concat(variables('octet1'), '.', add(variables('siteDefs')[variables('azlocation')].octet2, variables('envDefs').d.envIncrement), '.', variables('octet3'), '.0', variables('siteDefs')[variables('azlocation')].addressSpace)]"
+            }
+        ],
 
         // put the tier names in an array so I can loop over them later.
         "tiersArray": "[split(parameters('tierNames'), ' ')]",
@@ -155,7 +203,8 @@
         },
         // === Virtual Network Peerings ===
         {
-            "condition": "[parameters('createPeering')]",
+            // do this only for non-hub environment deployments - these need a single peering to the hub vnet
+            "condition": "[not(equals(variables('environmentSuffix'),'h'))]",
             "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
             "name": "[concat(variables('vnetName'), '/', variables('vnetName'),'_',variables('hubvnetName'),'-peering')]",
             "dependsOn": [
@@ -176,6 +225,39 @@
                     ]
                 },
                 "peeringState": "Connected"
+            }
+        },
+        // === Virtual Network Peerings (contd.) ===
+        {
+            // do this only for hub environment deployments - this requires multiple peers
+            "condition": "[and(parameters('createPeering'), equals(variables('environmentSuffix'),'h'))]",
+            "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+            "name": "[concat(variables('vnetName'), '/', variables('vnetName'),'_',variables('peerTable')[copyIndex()].vnetName,'-peering')]",
+            
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', variables('vnetName'))]"
+            ],
+            "apiVersion": "2020-07-01",
+            "properties": {
+                "allowVirtualNetworkAccess": true,
+                "allowForwardedTraffic": true,
+                "allowGatewayTransit": false,
+                "useRemoteGateways": false,
+                "remoteVirtualNetwork": {
+                    "id": "[variables('peerTable')[copyIndex()].vnetID]"
+                    
+                },
+                "remoteAddressSpace": {
+                    "addressPrefixes": [
+                        "[variables('peerTable')[copyIndex()].addressSpace]"
+                    ]
+                },
+                "peeringState": "Connected"
+            },
+            // loop over each of my environments (peerTable entries) to create a peering
+            "copy": {
+                "name": "subnet-loop",
+                "count": "[length(variables('peerTable'))]"
             }
         },
         // === Subnets ===

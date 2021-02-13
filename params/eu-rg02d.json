@@ -6,10 +6,10 @@
             "value": "Ireland"
         },
         "environmentName": {
-            "value": "Pre-Production"
+            "value": "Development"
         },
         "rgNumber": {
-            "value": "01"
+            "value": "02"
         },
         "principalId": {
             "value": "2d5034bf-d3c3-4b4d-a04f-af74cc637cae"
