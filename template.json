@@ -36,7 +36,7 @@
             "metadata": {
                 "description": "Create peering to hub vnet?"
             },
-            "defaultValue": false
+            "defaultValue": true
         }
     },
     "variables": {
@@ -109,7 +109,7 @@
         "huboctet1": "[variables('siteDefs')[variables('azlocation')].octet1]",
         "huboctet2": "[add(variables('siteDefs')[variables('azlocation')].octet2, variables('envDefs').h.envIncrement)]",
         "huboctet3": "[variables('siteDefs')[variables('azlocation')].octet3]",
-        "hubaddressSpace": "[concat(variables('huboctet1'), '.', variables('huboctet2'), '.', variables('huboctet3'), '.0', variables('siteDefs')[variables('azlocation')].subnetSize)]",
+        "hubaddressSpace": "[concat(variables('huboctet1'), '.', variables('huboctet2'), '.', variables('huboctet3'), '.0', variables('siteDefs')[variables('azlocation')].addressSpace)]",
 
         // put the tier names in an array so I can loop over them later.
         "tiersArray": "[split(parameters('tierNames'), ' ')]",
