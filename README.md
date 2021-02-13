@@ -1,6 +1,8 @@
 ## To deploy the resource group
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Frakheshster%2FnTierARM%2Fmain%2Frgtemplate.json)
 
+**Note**: The only advantage of deploying the resource group via a template is that I can set ACLs and lock it. I'd still have to select a location manually irrespective of whatever friendly location name I choose when deploying or in the paramters file. 
+
 ```
 az deployment sub create --location <location> --template-file <path-to-template>
 ```
@@ -14,7 +16,6 @@ And this for a user ID:
 ```
 az ad user show --id "{email}" --query objectId --output tsv
 ```
-
 
 ## To deploy the VNets etc. to the resource group
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Frakheshster%2FnTierARM%2Fmain%2Ftemplate.json)
