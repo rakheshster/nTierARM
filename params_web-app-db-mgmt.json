@@ -5,8 +5,8 @@
         "tierNames": {
             "value": "web application database"
         },
-        "gatewaySubnetRequired": {
-            "value": false
+        "mgmtSubnetRequired": {
+            "value": true
         },
         "vnetNumber": {
             "value": "01"

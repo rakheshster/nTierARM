@@ -5,16 +5,21 @@
         "tierNames": {
             "type": "string",
             "metadata": {
-                "description": "A space separated list of tiers"
+                "description": "A space separated list of tiers (leave at default if none)"
             },
-            "defaultValue": "web application database"
+            "defaultValue": "<none>"
+            // note to future self: I have to workaround like this because an empty string becomes an array of one "emptiness" apparently
+            // when I split later. so I need to put some placeholder text I can match against as the default. 
+            // the alternative is to not have a default value and so the array is empty. but this fails because then ARM considers the array
+            // as not existing in the first place. so I will have to do a hack like proxy this array. 
+            // see https://stackoverflow.com/questions/53722613/arm-resource-iteration-failing-with-an-empty-array for some context
         },
-        "gatewaySubnetRequired": {
+        "mgmtSubnetRequired": {
             "type": "bool",
             "metadata": {
-                "description": "Do you want a gateway subnet?"
+                "description": "Do you want a management/ hub subnet?"
             },
-            "defaultValue": false
+            "defaultValue": true
         },
         "vnetNumber": {
             "type": "string",
@@ -30,6 +35,7 @@
     "variables": {
         // these are my various sites and their properties - I use this to get the code based on selections above
         // subnetGap is how I increment the 3rd octet for each subnet/ tier. if I change this be sure to change subnetSize mask.
+        // its easier to think of subnetGap as how many /24 subnets I am combining for that subnet's address space. so 2x /24 = /23 hence 2.
         // first octet is constant. second octet is incremented per environment. third octet is incremented per subnet. last octet is the host address.
         "siteDefs": {
             // Ireland
@@ -74,7 +80,8 @@
             "p":  { "envIncrement": 0 },
             "e":  { "envIncrement": 1 },
             "u":  { "envIncrement": 2 },
-            "d":  { "envIncrement": 3 }
+            "d":  { "envIncrement": 3 },
+            "h":  { "envIncrement": 4 }
         },
 
         // I create my real octets based on the env & region; then create variables for addressSpace and addressPrefix so I can use them easily later
@@ -90,11 +97,13 @@
 
         // put the tier names in an array so I can loop over them later.
         "tiersArray": "[split(parameters('tierNames'), ' ')]",
-        "gatewayTier": "[if(parameters('gatewaySubnetRequired'), 'GatewaySubnet', 'Unused')]"
+        "mgmtTier": "[if(parameters('mgmtSubnetRequired'), 'mgmt', 'unused')]"
     },
     "resources": [
         // === Network Security Groups ===
         {
+            // skip if we have zero tiers
+            "condition": "[not(equals(variables('tiersArray')[0], '<none>'))]",
             "type": "Microsoft.Network/networkSecurityGroups",
             "apiVersion": "2020-05-01",
             // the name is <site code>-<tier name>-nsg<env suffix>
@@ -129,6 +138,8 @@
         },
         // === Subnets ===
         {
+            // skip if we have zero tiers
+            "condition": "[not(equals(variables('tiersArray')[0], '<none>'))]",
             "type": "Microsoft.Network/virtualNetworks/subnets",
             // dont do this for the GatewaySubnet or Unused subnet
             "apiVersion": "2020-07-01",
@@ -160,7 +171,7 @@
             // special case for the GatewaySubnet
             "apiVersion": "2020-07-01",
             // the name is <vnetName>/<tierName>
-            "name": "[concat(variables('vnetName'), '/', variables('gatewayTier'))]",
+            "name": "[concat(variables('vnetName'), '/', variables('mgmtTier'))]",
             "properties": {
                 "addressPrefix": "[concat(variables('addressPrefix'), '.0.', variables('subnetSize'))]"
             },
@@ -170,6 +181,8 @@
         },
         // === Public IPs for my Load Balancers ===
         {
+            // skip if we have zero tiers
+            "condition": "[not(equals(variables('tiersArray')[0], '<none>'))]",
             "type": "Microsoft.Network/publicIPAddresses",
             "apiVersion": "2020-07-01",
             // the name is <site code>-<tier name>-lbpip<env suffix>
@@ -190,8 +203,10 @@
                 "count": "[length(variables('tiersArray'))]"
             }
         },
-        // === Load Balancers (except Gateway and Unused)===
+        // === Load Balancers ===
         {
+            // skip if we have zero tiers
+            "condition": "[not(equals(variables('tiersArray')[0], '<none>'))]",
             "type": "Microsoft.Network/loadBalancers",
             "apiVersion": "2020-05-01",
             // the name is <site code>-<tier name>-lb<env suffix>

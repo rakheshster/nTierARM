@@ -18,7 +18,7 @@
                 "description": "Environment to deploy to"
             },
             "allowedValues": [
-                "Production", "Pre-Production", "UAT", "Development"
+                "Production", "Pre-Production", "UAT", "Development", "Hub"
             ],
             "defaultValue": "Production"
         },
@@ -59,7 +59,8 @@
             "Production":       { "envSuffix": "p" },
             "Pre-Production":   { "envSuffix": "e" },
             "UAT":              { "envSuffix": "u" },
-            "Development":      { "envSuffix": "d" }
+            "Development":      { "envSuffix": "d" },
+            "Hub":              { "envSuffix": "h" }
         },
         "rgName": "[concat(variables('siteDefs')[parameters('siteName')].sitePrefix, '-rg', parameters('rgNumber'), variables('envDefs')[parameters('environmentName')].envSuffix)]",
         "azLocation": "[variables('siteDefs')[parameters('siteName')].azLocation]",

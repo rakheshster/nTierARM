@@ -1,0 +1,78 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "tierName": {
+            "type": "string",
+            "metadata": {
+                "description": "The tier to deploy this to"
+            }
+        },
+        "numberOfVMs": {
+            "type": "int",
+            "metadata": {
+                "description": "Number of VMs to create"
+            },
+            "defaultValue": 1
+        },
+        "nameArtifact": {
+            "type": "string",
+            "metadata": {
+                "description": "Part of the VM name that denotes its role - e.g. xddc (don't add any numbers or site info please)"
+            }
+        },
+        "vnetNumber": {
+            "type": "string",
+            "allowedValues": [
+                "01", "02", "03", "04"
+            ],
+            "metadata": {
+                "description": "01 if for vnet01, 02 for vnet02, and so on ..."
+            },
+            "defaultValue": "01"
+        }
+    },
+    "variables": {
+        "siteDefs": {
+            // Ireland
+            "northeurope":      { "sitePrefix": "eu1" },
+            // Amsterdam (DR)
+            "westeurope":       { "sitePrefix": "eu2" },
+            // Toronto
+            "canadacentral":    { "sitePrefix": "am1" },
+            // Quebec (DR)
+            "canadaeast":       { "sitePrefix": "am2" },
+            // Hong Kong
+            "eastasia":         { "sitePrefix": "ap1" },
+            // Singapore (DR)
+            "southeastasia":    { "sitePrefix": "ap2" }
+        },
+        // setting these variables so I can refer to them easily later rather than use the long form referencing the array
+        "azlocation": "[resourceGroup().location]",
+        "sitePrefix": "[variables('siteDefs')[variables('azlocation')].sitePrefix]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Compute/availabilitySets",
+            "apiVersion": "2019-07-01",
+            "name": "[parameters('availabilitySets_EU1_Web_AS_name')]",
+            "location": "northeurope",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_EU1_Web01U_name'))]"
+            ],
+            "sku": {
+                "name": "Aligned"
+            },
+            "properties": {
+                "platformUpdateDomainCount": 5,
+                "platformFaultDomainCount": 3,
+                "virtualMachines": [
+                    {
+                        "id": "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_EU1_Web01U_name'))]"
+                    }
+                ]
+            }
+        }
+    ],
+    "outputs": {}
+}
