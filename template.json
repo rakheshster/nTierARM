@@ -30,6 +30,13 @@
                 "description": "01 if for vnet01, 02 for vnet02, and so on ..."
             },
             "defaultValue": "01"
+        },
+        "createPeering": {
+            "type": "bool",
+            "metadata": {
+                "description": "Create peering to hub vnet?"
+            },
+            "defaultValue": false
         }
     },
     "variables": {
@@ -81,7 +88,7 @@
             "e":  { "envIncrement": 1 },
             "u":  { "envIncrement": 2 },
             "d":  { "envIncrement": 3 },
-            "h":  { "envIncrement": 4 }
+            "h":  { "envIncrement": 4 } // if you change this be sure to change the hubvnetName etc. variables below
         },
 
         // I create my real octets based on the env & region; then create variables for addressSpace and addressPrefix so I can use them easily later
@@ -94,6 +101,16 @@
         "addressSpace": "[concat(variables('octet1'), '.', variables('octet2'), '.', variables('octet3'), '.', variables('subnetSize'))]",
         "addressPrefix": "[concat(variables('octet1'), '.', variables('octet2'))]",
         "vnetName": "[concat(variables('sitePrefix'), '-vnet', parameters('vnetNumber'), variables('environmentSuffix'))]",
+
+        // calculate the hub resource groups's vnet name etc. so I can use it for peering later if it exists
+        "hubvnetName": "[replace(variables('vnetName'), variables('environmentSuffix'), 'h')]",
+        "hubrgName": "[replace(resourceGroup().name, variables('environmentSuffix'), 'h')]",
+        "hubvnetID": "[resourceId(variables('hubrgName'), 'Microsoft.Network/virtualNetworks', variables('hubvnetName'))]",
+        "huboctet1": "[variables('siteDefs')[variables('azlocation')].octet1]",
+        "huboctet2": "[add(variables('siteDefs')[variables('azlocation')].octet2, variables('envDefs').h.envIncrement)]",
+        "huboctet3": "[variables('siteDefs')[variables('azlocation')].octet3]",
+        "hubsubnetSize": "[variables('siteDefs')[variables('azlocation')].subnetSize]",
+        "hubaddressSpace": "[concat(variables('huboctet1'), '.', variables('huboctet2'), '.', variables('huboctet3'), '.', variables('hubsubnetSize'))]",
 
         // put the tier names in an array so I can loop over them later.
         "tiersArray": "[split(parameters('tierNames'), ' ')]",
@@ -124,6 +141,7 @@
             "name": "[variables('vnetName')]",
             "location": "[variables('azLocation')]",
             "properties": {
+                // I could do the peerings here I suppose but I chose to do it as a separate thing later so I can conditionally do it
                 "virtualNetworkPeerings": [],
                 "enableDdosProtection": false,
                 "enableVmProtection": false,
@@ -134,6 +152,28 @@
                 }
                 // subnets are created later on. initially I was doing a copy block here but that failed coz applying an NSG on GatewaySubnet is disallowed
                 // and I couldn't put in a condition block within a copy block. so I split out subnet creation for later. 
+            }
+        },
+        // === Virtual Network Peerings ===
+        {
+            "condition": "[parameters('createPeering')]",
+            "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+            "name": "[concat(variables('vnetName'), '/', variables('vnetName'),'_',variables('hubvnetName'),'-peering')]",
+            "apiVersion": "2020-07-01",
+            "properties": {
+                "allowVirtualNetworkAccess": true,
+                "allowForwardedTraffic": true,
+                "allowGatewayTransit": false,
+                "useRemoteGateways": false,
+                "remoteVirtualNetwork": {
+                    "id": "[variables('hubvnetID')]"
+                },
+                "remoteAddressSpace": {
+                    "addressPrefixes": [
+                        "[variables('hubaddressSpace')]"
+                    ]
+                },
+                "peeringState": "Connected"
             }
         },
         // === Subnets ===
