@@ -5,6 +5,9 @@
         "tierNames": {
             "value": "web application database"
         },
+        "loadBalancerRequirement": {
+            "value": "yes yes no"
+        },
         "mgmtSubnetRequired": {
             "value": true
         },
