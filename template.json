@@ -5,7 +5,7 @@
         "tierNames": {
             "type": "string",
             "metadata": {
-                "description": "A space separated list of tiers (leave at <none> if none)(add a +l to each tier for a load balancer - e.g. web+l app+l db)"
+                "description": "A space separated list of tiers (leave at <none> if none)"
             },
             "defaultValue": "<none>"
             // note to future self: 
@@ -14,6 +14,13 @@
             // the alternative is to not have a default value and so the array is empty. but this fails because then ARM considers the array
             // as not existing in the first place. so I will have to do a hack like proxy this array. 
             // see https://stackoverflow.com/questions/53722613/arm-resource-iteration-failing-with-an-empty-array for some context
+        },
+        "loadBalancerRequirement": {
+            "type": "string",
+            "metadata": {
+                "description": "A space separated list of yes or no depending on whether the tier needs a load balancer"
+            },
+            "defaultValue": "<none>"
         },
         "mgmtSubnetRequired": {
             "type": "bool",
@@ -34,9 +41,9 @@
         },
         "createPeering": {
             "type": "bool",
-            "defaultValue": false,
+            "defaultValue": true,
             "metadata": {
-                "description": "Only used for the hub environment. Set to true once all other environments are created, to create peering from hub to those."
+                "description": "Should I create peerings (from hub to all; and from each to hub)? Set this to true only after the hub and all environments are created."
             }
         }
     },
@@ -159,9 +166,10 @@
             }
         ],
 
-        // put the tier names in an array so I can loop over them later.
+        // put the tier names in an array so I can loop over them later. 
         "tiersArray": "[split(parameters('tierNames'), ' ')]",
-        "mgmtTier": "[if(parameters('mgmtSubnetRequired'), 'mgmt', 'unused')]"
+        "mgmtTier": "[if(parameters('mgmtSubnetRequired'), 'mgmt', 'unused')]",
+        "loadBalancerRequirementArray": "[split(parameters('loadBalancerRequirement'), ' ')]"
     },
     "resources": [
         // === Network Security Groups ===
@@ -178,6 +186,8 @@
             },
             "copy": {
                 "name": "nsg-loop",
+                // to work around this error - Another operation on this or dependent resource is in progress.
+                "mode": "serial",
                 "count": "[length(variables('tiersArray'))]"
             }
         },
@@ -204,7 +214,7 @@
         // === Virtual Network Peerings ===
         {
             // do this only for non-hub environment deployments - these need a single peering to the hub vnet
-            "condition": "[not(equals(variables('environmentSuffix'),'h'))]",
+            "condition": "[and(parameters('createPeering'), not(equals(variables('environmentSuffix'),'h')))]",
             "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
             "name": "[concat(variables('vnetName'), '/', variables('vnetName'),'_',variables('hubvnetName'),'-peering')]",
             "dependsOn": [
@@ -285,6 +295,8 @@
             // loop over each of my tiers to create this per tier
             "copy": {
                 "name": "subnet-loop",
+                // to work around this error - Another operation on this or dependent resource is in progress.
+                "mode": "serial",
                 "count": "[length(variables('tiersArray'))]"
             }
         },
@@ -305,8 +317,8 @@
         },
         // === Public IPs for my Load Balancers ===
         {
-            // skip if we have zero tiers
-            "condition": "[not(equals(variables('tiersArray')[0], '<none>'))]",
+            // skip if we have zero tiers or its not required
+            "condition": "[and(not(equals(variables('loadBalancerRequirementArray')[0], '<none>')), equals(variables('loadBalancerRequirementArray')[copyIndex()], 'yes'))]",
             "type": "Microsoft.Network/publicIPAddresses",
             "apiVersion": "2020-07-01",
             // the name is <site code>-<tier name>-lbpip<env suffix>
@@ -329,8 +341,8 @@
         },
         // === Load Balancers ===
         {
-            // skip if we have zero tiers
-            "condition": "[not(equals(variables('tiersArray')[0], '<none>'))]",
+            // skip if we have zero tiers ot its not required
+            "condition": "[and(not(equals(variables('loadBalancerRequirementArray')[0], '<none>')), equals(variables('loadBalancerRequirementArray')[copyIndex()], 'yes'))]",
             "type": "Microsoft.Network/loadBalancers",
             "apiVersion": "2020-05-01",
             // the name is <site code>-<tier name>-lb<env suffix>

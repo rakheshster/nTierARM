@@ -3,7 +3,10 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "tierNames": {
-            "value": "web+l application+l database"
+            "value": "web application database"
+        },
+        "loadBalancerRequirement": {
+            "value": "yes yes no"
         },
         "mgmtSubnetRequired": {
             "value": true
