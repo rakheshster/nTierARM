@@ -3,7 +3,7 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "tierNames": {
-            "value": "web application database"
+            "value": "web+l application+l database"
         },
         "mgmtSubnetRequired": {
             "value": true

@@ -5,7 +5,7 @@
         "tierNames": {
             "type": "string",
             "metadata": {
-                "description": "A space separated list of tiers (leave at default if none)"
+                "description": "A space separated list of tiers (leave at <none> if none)(add a +l to each tier for a load balancer - e.g. web+l app+l db)"
             },
             "defaultValue": "<none>"
             // note to future self: 
